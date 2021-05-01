@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Yamashou/proto-to-dart-http/dart"
+	"proto-to-dart-http/dart"
 
 	"golang.org/x/xerrors"
 

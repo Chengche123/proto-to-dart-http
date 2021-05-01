@@ -1,7 +1,8 @@
 package main
 
 import (
-	"github.com/Yamashou/proto-to-dart-http/dart"
+	"proto-to-dart-http/dart"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/jhump/protoreflect/desc"
 	"golang.org/x/xerrors"
