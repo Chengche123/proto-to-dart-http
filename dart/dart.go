@@ -3,6 +3,7 @@ package dart
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -66,7 +67,10 @@ type GenerateDart struct {
 
 func NewGenerateDart(name string) (*GenerateDart, error) {
 	fName := ProjectFileName(name)
-	file, err := os.OpenFile(fmt.Sprintf("%s.pb.dart", fName), os.O_RDWR|os.O_CREATE, 0664)
+	ext := filepath.Ext(fName)
+	prefix := fName[:len(fName)-len(ext)]
+
+	file, err := os.OpenFile(fmt.Sprintf("%s.pb.http.dart", prefix), os.O_RDWR|os.O_CREATE, 0664)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to get absolute path: %w", err)
 	}
@@ -187,7 +191,7 @@ func WriteClass(g *GenerateDart, apiParams []*APIParam, project string) error {
 }
 
 func Build(apiParams []*APIParam, project, path string) (*GenerateDart, error) {
-	g, err := NewGenerateDart(project)
+	g, err := NewGenerateDart(apiParams[0].FileName)
 	if err != nil {
 		return nil, xerrors.Errorf(": %w", err)
 	}

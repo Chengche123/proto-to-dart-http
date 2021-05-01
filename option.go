@@ -30,9 +30,9 @@ Options\n`, os.Args[0], os.Args[0])
 		return nil, nil, xerrors.Errorf("failed to get current directory: %v", err)
 	}
 
-	projectName := flag.String("p", "", `project name`)
-	outPutPass := flag.String("o", "", `out put pass`)
-	packagePath := flag.String("pp", "/", `project name`)
+	projectName := flag.String("p", "", `dart项目名`)
+	outPutPass := flag.String("o", "", `output path`)
+	packagePath := flag.String("pp", "/", `dart项目中原pb文件导入路径`)
 	protoImportOpt := flag.String("i", dir, `pb files import directory`)
 	flag.Parse()
 
