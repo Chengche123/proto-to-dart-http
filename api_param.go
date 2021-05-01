@@ -46,21 +46,27 @@ func setFileName(as []*dart.APIParam, name string) []*dart.APIParam {
 func (a *apiParamsBuilder) build(method *desc.MethodDescriptor, service *desc.ServiceDescriptor) ([]*dart.APIParam, error) {
 	opts := method.GetOptions()
 
-	if !proto.HasExtension(opts, annotations.E_Http) {
-		return []*dart.APIParam{}, nil
+	var rule *annotations.HttpRule
+	var ok bool
+	if proto.HasExtension(opts, annotations.E_Http) {
+		ext, err := proto.GetExtension(opts, annotations.E_Http)
+		if err != nil {
+			return nil, xerrors.Errorf(": %w", err)
+		}
+		rule, ok = ext.(*annotations.HttpRule)
+		if !ok {
+			return nil, xerrors.New("annotation extension assertion error")
+		}
+	} else {
+		rule = &annotations.HttpRule{
+			Body: "*",
+			Pattern: &annotations.HttpRule_Post{
+				Post: "/" + service.GetName() + "/" + method.GetName(),
+			},
+		}
 	}
 
-	ext, err := proto.GetExtension(opts, annotations.E_Http)
-	if err != nil {
-		return nil, xerrors.Errorf(": %w", err)
-	}
-
-	rule, ok := ext.(*annotations.HttpRule)
-	if !ok {
-		return nil, xerrors.New("annotation extension assertion error")
-	}
-
-	apiParams, err := a.apiParamsByHTTPRule(rule, method.GetInputType(), method.GetOutputType(), method.GetName())
+	apiParams, err := a.apiParamsByHTTPRule(rule, method.GetInputType(), method.GetOutputType(), method.GetName(), service)
 	if err != nil {
 		return nil, xerrors.Errorf(": %w", err)
 	}
@@ -68,7 +74,7 @@ func (a *apiParamsBuilder) build(method *desc.MethodDescriptor, service *desc.Se
 	return apiParams, nil
 }
 
-func (a *apiParamsBuilder) apiParamsByHTTPRule(rule *annotations.HttpRule, inputType *desc.MessageDescriptor, outputType *desc.MessageDescriptor, name string) ([]*dart.APIParam, error) {
+func (a *apiParamsBuilder) apiParamsByHTTPRule(rule *annotations.HttpRule, inputType *desc.MessageDescriptor, outputType *desc.MessageDescriptor, name string, service *desc.ServiceDescriptor) ([]*dart.APIParam, error) {
 	var apiParams []*dart.APIParam
 
 	apiParam, err := a.apiParamByHTTPRule(rule, inputType, outputType, name)
@@ -76,6 +82,7 @@ func (a *apiParamsBuilder) apiParamsByHTTPRule(rule *annotations.HttpRule, input
 		return nil, xerrors.Errorf(": %w", err)
 	}
 
+	apiParam.ServiceName = service.GetName()
 	apiParams = append(apiParams, apiParam)
 
 	for _, r := range rule.GetAdditionalBindings() {

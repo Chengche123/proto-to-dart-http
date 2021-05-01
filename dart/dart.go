@@ -15,13 +15,14 @@ func DartFileName(name string) string {
 }
 
 type APIParam struct {
-	HTTPMethod string
-	APIName    string
-	Path       string
-	Body       string
-	FileName   string
-	Request    Request
-	Response   Response
+	ServiceName string
+	HTTPMethod  string
+	APIName     string
+	Path        string
+	Body        string
+	FileName    string
+	Request     Request
+	Response    Response
 }
 
 func FileNames(as []*APIParam) []string {
@@ -79,7 +80,11 @@ func NewGenerateDart(name string) (*GenerateDart, error) {
 }
 
 func WriteImports(g *GenerateDart, apiParams []*APIParam, project, path string) error {
-	_, err := fmt.Fprint(g.File, "import 'package:http/http.dart' as http;\n")
+	_, err := fmt.Fprint(g.File, "import 'dart:convert';\n")
+	if err != nil {
+		return xerrors.Errorf(": %w", err)
+	}
+	_, err = fmt.Fprint(g.File, "import 'package:http/http.dart' as http;\n")
 	if err != nil {
 		return xerrors.Errorf(": %w", err)
 	}
@@ -142,8 +147,8 @@ func toCamel(s string) string {
 }
 
 func WriteClass(g *GenerateDart, apiParams []*APIParam, project string) error {
-	camelProject := toCamel(project)
-	_, err := fmt.Fprintf(g.File, "class %sClient {\n", camelProject)
+	serviceName := apiParams[0].ServiceName
+	_, err := fmt.Fprintf(g.File, "class %sClient {\n", serviceName)
 	if err != nil {
 		return xerrors.Errorf(": %w", err)
 	}
@@ -153,7 +158,7 @@ func WriteClass(g *GenerateDart, apiParams []*APIParam, project string) error {
 		return xerrors.Errorf(": %w", err)
 	}
 
-	_, err = fmt.Fprintf(g.File, "\t%sClient(String baseUrl) {this.baseUrl = baseUrl;}\n", camelProject)
+	_, err = fmt.Fprintf(g.File, "\t%sClient(String baseUrl) {this.baseUrl = baseUrl;}\n", serviceName)
 	if err != nil {
 		return xerrors.Errorf(": %w", err)
 	}
@@ -163,10 +168,12 @@ func WriteClass(g *GenerateDart, apiParams []*APIParam, project string) error {
 		_, err = fmt.Fprintf(g.File,
 			"\tFuture<%s> %c%s(%s body, Map<String, String> headers) async {\n"+
 				"\t\tfinal response = await http.%s(\n"+
-				"\t\t\tthis.baseUrl + \"%s\",\n"+
-				"\t\t\tbody: body.writeToBuffer(),\n"+
+				"\t\t\tUri.parse(this.baseUrl + \"%s\"),\n"+
+				"\t\t\tbody: json.encode(body),\n"+
 				"\t\t\theaders: headers);\n\n"+
-				"\t\tfinal %s res = %s.fromBuffer(response.bodyBytes);\n"+
+				"\t\tif (response.statusCode != 200) throw response.body;\n"+
+				"\t\tvar raw = json.decode(Utf8Decoder().convert(response.bodyBytes));\n"+
+				"\t\tfinal %s res = %s.fromJson(raw);\n"+
 				"\t\treturn res;\n\t}\n\n",
 			apiParam.Response.Name,
 			strings.ToLower(apiParam.APIName)[0],
@@ -191,6 +198,10 @@ func WriteClass(g *GenerateDart, apiParams []*APIParam, project string) error {
 }
 
 func Build(apiParams []*APIParam, project, path string) (*GenerateDart, error) {
+	if len(apiParams) < 1 {
+		return nil, xerrors.Errorf("invalid apiParams")
+	}
+
 	g, err := NewGenerateDart(apiParams[0].FileName)
 	if err != nil {
 		return nil, xerrors.Errorf(": %w", err)
