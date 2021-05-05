@@ -80,14 +80,14 @@ func NewGenerateDart(name string) (*GenerateDart, error) {
 }
 
 func WriteImports(g *GenerateDart, apiParams []*APIParam, project, path string) error {
-	_, err := fmt.Fprint(g.File, "import 'dart:convert';\n")
+	_, err := fmt.Fprint(g.File, "import 'package:dio/dio.dart';\n")
 	if err != nil {
 		return xerrors.Errorf(": %w", err)
 	}
-	_, err = fmt.Fprint(g.File, "import 'package:http/http.dart' as http;\n")
-	if err != nil {
-		return xerrors.Errorf(": %w", err)
-	}
+	// _, err = fmt.Fprint(g.File, "import 'package:http/http.dart' as http;\n")
+	// if err != nil {
+	// 	return xerrors.Errorf(": %w", err)
+	// }
 
 	dartProject := ProjectFileName(project)
 	files := FileNames(apiParams)
@@ -153,12 +153,12 @@ func WriteClass(g *GenerateDart, apiParams []*APIParam, project string) error {
 		return xerrors.Errorf(": %w", err)
 	}
 
-	_, err = fmt.Fprint(g.File, "\tString baseUrl;\n")
+	_, err = fmt.Fprint(g.File, "\tfinal Dio _dio;\n")
 	if err != nil {
 		return xerrors.Errorf(": %w", err)
 	}
 
-	_, err = fmt.Fprintf(g.File, "\t%sClient(String baseUrl) {this.baseUrl = baseUrl;}\n", serviceName)
+	_, err = fmt.Fprintf(g.File, "\t%sClient(this._dio);\n\n", serviceName)
 	if err != nil {
 		return xerrors.Errorf(": %w", err)
 	}
@@ -166,22 +166,18 @@ func WriteClass(g *GenerateDart, apiParams []*APIParam, project string) error {
 	for i := range apiParams {
 		apiParam := apiParams[i]
 		_, err = fmt.Fprintf(g.File,
-			"\tFuture<%s> %c%s(%s body, Map<String, String> headers) async {\n"+
-				"\t\tfinal response = await http.%s(\n"+
-				"\t\t\tUri.parse(this.baseUrl + \"%s\"),\n"+
-				"\t\t\tbody: json.encode(body),\n"+
-				"\t\t\theaders: headers);\n\n"+
-				"\t\tif (response.statusCode != 200) throw response.body;\n"+
-				"\t\tvar raw = json.decode(Utf8Decoder().convert(response.bodyBytes));\n"+
-				"\t\tfinal %s res = %s.fromJson(raw);\n"+
-				"\t\treturn res;\n\t}\n\n",
+			"\tFuture<%s> %c%s(%s body, Map<String, dynamic> headers) async {\n"+
+				"\t\tResponse response = await _dio.%s(\n"+
+				"\t\t\t\"%s\",\n"+
+				"\t\t\toptions: Options(headers: headers,),\n"+
+				"\t\t\tdata: body.toJson());\n\n"+
+				"\t\treturn %s.fromJson(response.data);\n\t}\n\n",
 			apiParam.Response.Name,
 			strings.ToLower(apiParam.APIName)[0],
 			apiParam.APIName[1:],
 			apiParam.Request.Name,
 			strings.ToLower(apiParam.HTTPMethod),
 			apiParam.Path,
-			apiParam.Response.Name,
 			apiParam.Response.Name,
 		)
 		if err != nil {
